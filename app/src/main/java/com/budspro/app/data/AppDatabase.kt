@@ -6,15 +6,17 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 import com.budspro.app.data.MIGRATION_1_2
+import com.budspro.app.data.MIGRATION_2_3
 
 @Database(
-    entities = [GameItem::class, Folder::class],
-    version = 2,
+    entities = [GameItem::class, Folder::class, StudyAnnotation::class],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun gameDao(): GameDao
     abstract fun folderDao(): FolderDao
+    abstract fun studyAnnotationDao(): StudyAnnotationDao
 
     companion object {
         @Volatile
@@ -26,7 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "buds_pro.db"
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
         }
     }

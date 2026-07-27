@@ -39,6 +39,9 @@ interface GameDao {
     @Query("UPDATE games SET title = :name WHERE id = :id")
     suspend fun updateTitle(id: String, name: String)
 
+    @Query("UPDATE games SET tags = :tags WHERE id = :id")
+    suspend fun updateTags(id: String, tags: String?)
+
     @Query("SELECT * FROM games WHERE folderId = :folderId")
     suspend fun getItemsInFolder(folderId: String): List<GameItem>
 

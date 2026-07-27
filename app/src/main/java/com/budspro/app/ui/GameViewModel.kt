@@ -137,4 +137,29 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     val recent: StateFlow<List<GameItem>> = games
         .map { it.filter { item -> item.lastPlayedAt != null }.sortedByDescending { item -> item.lastPlayedAt ?: 0L } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun updateTags(id: String, tags: String?) {
+        viewModelScope.launch(Dispatchers.IO) { dao.updateTags(id, tags) }
+    }
+
+    fun updateProgressValue(id: String, progress: Int) {
+        viewModelScope.launch(Dispatchers.IO) { dao.updateProgress(id, progress, System.currentTimeMillis()) }
+    }
+
+    private val annotationDao = AppDatabase.getInstance(app).studyAnnotationDao()
+
+    fun getAnnotations(gameId: String): Flow<List<com.budspro.app.data.StudyAnnotation>> =
+        annotationDao.getByGameId(gameId)
+
+    fun insertAnnotation(annotation: com.budspro.app.data.StudyAnnotation) {
+        viewModelScope.launch(Dispatchers.IO) { annotationDao.insert(annotation) }
+    }
+
+    fun deleteAnnotation(id: String) {
+        viewModelScope.launch(Dispatchers.IO) { annotationDao.deleteById(id) }
+    }
+
+    fun deleteAnnotationsForGame(gameId: String) {
+        viewModelScope.launch(Dispatchers.IO) { annotationDao.deleteByGameId(gameId) }
+    }
 }
