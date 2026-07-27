@@ -129,6 +129,7 @@ fun LibraryScreen(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameCard(
     item: GameItem,
