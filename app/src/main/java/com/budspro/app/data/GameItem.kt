@@ -13,5 +13,7 @@ data class GameItem(
     val addedAt: Long,
     val lastPlayedAt: Long? = null,
     val progress: Int = 0,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    val coverPath: String? = null,
+    val folderId: String? = null
 )
