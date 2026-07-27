@@ -119,6 +119,7 @@ private enum class BudsTab(val label: String, val icon: ImageVector) {
     LIBRARY("Library", Icons.Filled.List),
     SAVES("Saves", Icons.Filled.Favorite),
     RECENT("Recent", Icons.Filled.Refresh),
+    STUDY("Study", Icons.Filled.Search),
     SETTINGS("Settings", Icons.Filled.Settings)
 }
 
@@ -167,6 +168,10 @@ fun BudsProApp(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
 
     val folderNameDialog = remember { mutableStateOf<String?>(null) }
     val renameFolderDialog = remember { mutableStateOf<Folder?>(null) }
+    var tagEditItem by remember { mutableStateOf<GameItem?>(null) }
+    var tagEditValue by remember { mutableStateOf("") }
+    var progressEditItem by remember { mutableStateOf<GameItem?>(null) }
+    var progressEditValue by remember { mutableStateOf(0) }
 
     val libraryEntries = if (selectedFolder != null) {
         games.filter { it.folderId == selectedFolder }
@@ -307,6 +312,7 @@ fun BudsProApp(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
                                             onFavorite = { viewModel.toggleFavorite(item) },
                                             onDelete = { pendingDelete = item },
                                             onCover = { pendingCoverItemId = item.id; coverPicker.launch(arrayOf("image/*")) },
+                                            onTags = { tagEditItem = item; tagEditValue = item.tags ?: "" },
                                             onMove = {},
                                             onRename = {},
                                             coverAvailable = !item.coverPath.isNullOrBlank(),
@@ -336,7 +342,7 @@ fun BudsProApp(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
                         else LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 96.dp)) {
                             items(count = saved.size, key = { saved[it].id }) { index ->
                                 val item = saved[index]
-                                GameCard(item = item, onOpen = { onOpen(item) }, onFavorite = { viewModel.toggleFavorite(item) }, onDelete = { pendingDelete = item }, onCover = {}, onMove = {}, onRename = {}, coverAvailable = !item.coverPath.isNullOrBlank(), viewModel = viewModel, selectedFolder = selectedFolder)
+                                GameCard(item = item, onOpen = { onOpen(item) }, onFavorite = { viewModel.toggleFavorite(item) }, onDelete = { pendingDelete = item }, onCover = {}, onTags = { tagEditItem = item; tagEditValue = item.tags ?: "" }, onMove = {}, onRename = {}, coverAvailable = !item.coverPath.isNullOrBlank(), viewModel = viewModel, selectedFolder = selectedFolder)
                             }
                         }
                     }
@@ -346,6 +352,12 @@ fun BudsProApp(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
                         else RecentList(entries = r, onOpen = onOpen, onFavorite = { viewModel.toggleFavorite(it) })
                     }
                     BudsTab.SETTINGS -> SettingsTab(totalCount = games.size, savedCount = favorites.size, recentCount = recent.size, totalBytes = games.sumOf { it.fileSize })
+                    BudsTab.STUDY -> StudyTabContent(games = games) { item ->
+                        val intent = Intent(context, StudyViewerActivity::class.java)
+                        intent.putExtra("gameId", item.id)
+                        intent.putExtra("fileName", item.fileName)
+                        context.startActivity(intent)
+                    }
                 }
             }
         }
@@ -367,12 +379,25 @@ fun BudsProApp(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
             TextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
         }, confirmButton = { TextButton(onClick = { viewModel.renameFolder(folder.id, name); renameFolderDialog.value = null }) { Text("Save") } }, dismissButton = { TextButton(onClick = { renameFolderDialog.value = null }) { Text("Cancel") } })
     }
+
+    tagEditItem?.let { item ->
+        AlertDialog(onDismissRequest = { tagEditItem = null; tagEditValue = "" }, title = { Text("Tags for \"${item.title}\"") }, text = {
+            TextField(value = tagEditValue, onValueChange = { tagEditValue = it }, label = { Text("Tags (comma-separated)") })
+        }, confirmButton = { TextButton(onClick = { viewModel.updateTags(item.id, tagEditValue); tagEditItem = null; tagEditValue = "" }) { Text("Save") } }, dismissButton = { TextButton(onClick = { tagEditItem = null; tagEditValue = "" }) { Text("Cancel") } })
+    }
+
+    progressEditItem?.let { item ->
+        AlertDialog(onDismissRequest = { progressEditItem = null; progressEditValue = 0 }, title = { Text("Progress for \"${item.title}\"") }, text = {
+            TextField(value = progressEditValue.toString(), onValueChange = { progressEditValue = it.toIntOrNull() ?: 0 }, label = { Text("Percent (0-100)") })
+        }, confirmButton = { TextButton(onClick = { viewModel.updateProgressValue(item.id, progressEditValue.coerceIn(0, 100)); progressEditItem = null; progressEditValue = 0 }) { Text("Save") } }, dismissButton = { TextButton(onClick = { progressEditItem = null; progressEditValue = 0 }) { Text("Cancel") } })
+    }
 }
 
 private fun subtitleFor(tab: BudsTab, total: Int, saved: Int, recent: Int): String = when (tab) {
     BudsTab.LIBRARY -> if (total == 1) "1 item" else "$total items"
     BudsTab.SAVES -> if (saved == 1) "1 saved" else "$saved saved"
     BudsTab.RECENT -> if (recent == 1) "1 recent" else "$recent recent"
+    BudsTab.STUDY -> "Study & annotate"
     BudsTab.SETTINGS -> "App info"
 }
 
@@ -384,6 +409,7 @@ fun GameCard(
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
     onCover: () -> Unit,
+    onTags: () -> Unit,
     onMove: () -> Unit,
     onRename: () -> Unit,
     coverAvailable: Boolean,
@@ -412,6 +438,8 @@ fun GameCard(
             }
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onCover) { Icon(Icons.Filled.Add, contentDescription = "Change cover", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = onTags) { Text("Tags", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = { progressEditItem = item; progressEditValue = item.progress }) { Text("Progress", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 IconButton(onClick = onFavorite) {
                     Icon(imageVector = if (item.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, contentDescription = if (item.isFavorite) "Remove from Saves" else "Save", tint = if (item.isFavorite) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant)
                 }

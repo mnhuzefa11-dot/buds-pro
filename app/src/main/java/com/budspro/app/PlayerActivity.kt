@@ -78,14 +78,28 @@ class PlayerActivity : ComponentActivity() {
                         webView.settings.allowFileAccess = false
                         webView.settings.allowContentAccess = false
 
-                        webView.webViewClient = object : WebViewClient() {
+                        val prefs = getSharedPreferences("buds_scroll", MODE_PRIVATE)
+                        val savedScroll = prefs.getInt(gameId, 0)
+                        val scrollClient = object : WebViewClient() {
                             override fun shouldInterceptRequest(
                                 view: WebView,
                                 request: WebResourceRequest
                             ) = assetLoader.shouldInterceptRequest(request.url)
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                val currentY = view?.scrollY ?: 0
+                                prefs.edit().putInt(gameId, currentY).apply()
+                            }
                         }
+                        webView.webViewClient = scrollClient
 
                         webView.loadUrl("https://appassets.androidplatform.net/games/${item.fileName}")
+                        if (savedScroll > 0) {
+                            webView.postDelayed({
+                                webView.evaluateJavascript("window.scrollTo(0, $savedScroll)") { }
+                            }, 800)
+                        }
 
                         CoroutineScope(Dispatchers.IO).launch {
                             dao.updateProgress(item.id, item.progress, System.currentTimeMillis())

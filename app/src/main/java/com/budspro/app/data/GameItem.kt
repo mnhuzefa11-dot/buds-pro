@@ -15,5 +15,6 @@ data class GameItem(
     val progress: Int = 0,
     val isFavorite: Boolean = false,
     val coverPath: String? = null,
-    val folderId: String? = null
+    val folderId: String? = null,
+    val tags: String? = null
 )
