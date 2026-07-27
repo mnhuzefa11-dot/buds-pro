@@ -19,6 +19,4 @@ interface StudyAnnotationDao {
     @Query("DELETE FROM study_annotations WHERE gameId = :gameId")
     suspend fun deleteByGameId(gameId: String)
 
-    @Query("SELECT * FROM study_annotations WHERE text LIKE '%' || :query || '%' OR gameId IN (SELECT id FROM games WHERE title LIKE '%' || :query || '%' OR tags LIKE '%' || :query || '%') ORDER BY createdAt DESC")
-    fun search(query: String): Flow<List<StudyAnnotation>>
 }
