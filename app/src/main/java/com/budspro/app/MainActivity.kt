@@ -11,6 +11,7 @@ import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -159,12 +160,12 @@ fun BudsProApp(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
         pickerLauncher.launch(arrayOf("text/html", "application/pdf", "application/json", "image/jpeg", "image/png", "image/webp", "*/*"))
     }
 
+    var pendingCoverItemId by remember { mutableStateOf<String?>(null) }
     val coverPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { viewModel.setCoverImage(pendingCoverItemId ?: return@let, it) }
     }
-    var pendingCoverItemId by remember { mutableStateOf<String?>(null) }
 
     val folderNameDialog = remember { mutableStateOf<String?>(null) }
     val renameFolderDialog = remember { mutableStateOf<Folder?>(null) }
@@ -244,7 +245,7 @@ fun BudsProApp(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
             }
         }
     ) { padding ->
-        AnimatedContent(targetState = selectedTab, transitionSpec = { fadeIn() with fadeOut() }, label = "tab") { tab ->
+        AnimatedContent(targetState = selectedTab, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { tab ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (tab) {
                     BudsTab.LIBRARY -> {
@@ -313,6 +314,7 @@ fun BudsProApp(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
                                             onDelete = { pendingDelete = item },
                                             onCover = { pendingCoverItemId = item.id; coverPicker.launch(arrayOf("image/*")) },
                                             onTags = { tagEditItem = item; tagEditValue = item.tags ?: "" },
+                                            onProgress = { progressEditItem = item; progressEditValue = item.progress },
                                             onMove = {},
                                             onRename = {},
                                             coverAvailable = !item.coverPath.isNullOrBlank(),
@@ -342,7 +344,7 @@ fun BudsProApp(viewModel: GameViewModel, onOpen: (GameItem) -> Unit) {
                         else LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 96.dp)) {
                             items(count = saved.size, key = { saved[it].id }) { index ->
                                 val item = saved[index]
-                                GameCard(item = item, onOpen = { onOpen(item) }, onFavorite = { viewModel.toggleFavorite(item) }, onDelete = { pendingDelete = item }, onCover = {}, onTags = { tagEditItem = item; tagEditValue = item.tags ?: "" }, onMove = {}, onRename = {}, coverAvailable = !item.coverPath.isNullOrBlank(), viewModel = viewModel, selectedFolder = selectedFolder)
+                                GameCard(item = item, onOpen = { onOpen(item) }, onFavorite = { viewModel.toggleFavorite(item) }, onDelete = { pendingDelete = item }, onCover = {}, onTags = { tagEditItem = item; tagEditValue = item.tags ?: "" }, onProgress = { progressEditItem = item; progressEditValue = item.progress }, onMove = {}, onRename = {}, coverAvailable = !item.coverPath.isNullOrBlank(), viewModel = viewModel, selectedFolder = selectedFolder)
                             }
                         }
                     }
@@ -410,6 +412,7 @@ fun GameCard(
     onDelete: () -> Unit,
     onCover: () -> Unit,
     onTags: () -> Unit,
+    onProgress: () -> Unit,
     onMove: () -> Unit,
     onRename: () -> Unit,
     coverAvailable: Boolean,
@@ -439,7 +442,7 @@ fun GameCard(
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onCover) { Icon(Icons.Filled.Add, contentDescription = "Change cover", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 IconButton(onClick = onTags) { Text("Tags", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(onClick = { progressEditItem = item; progressEditValue = item.progress }) { Text("Progress", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = onProgress) { Text("Progress", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 IconButton(onClick = onFavorite) {
                     Icon(imageVector = if (item.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, contentDescription = if (item.isFavorite) "Remove from Saves" else "Save", tint = if (item.isFavorite) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
