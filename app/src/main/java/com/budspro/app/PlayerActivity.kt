@@ -101,7 +101,12 @@ class PlayerActivity : ComponentActivity() {
         tv.text = text
         tv.setPadding(32, 32, 32, 32)
         tv.textSize = 14f
+        // Cosmetic only (the app theme is now dark): pin the colours so the
+        // JSON is always light-on-dark and never unreadable. Viewer logic
+        // itself is unchanged.
+        tv.setTextColor(0xFFF3F0FA.toInt())
         val scroll = ScrollView(this)
+        scroll.setBackgroundColor(0xFF0B0710.toInt())
         scroll.addView(tv)
         setContentView(scroll)
     }

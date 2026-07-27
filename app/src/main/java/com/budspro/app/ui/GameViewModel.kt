@@ -9,6 +9,7 @@ import com.budspro.app.data.GameItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
@@ -70,4 +71,32 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             dao.updateFavorite(item.id, !item.isFavorite)
         }
     }
+
+    /**
+     * Called right before an item is handed to PlayerActivity so the Recent
+     * tab is accurate for every file type (HTML, PDF and JSON alike).
+     * Purely a timestamp write — opening/playing logic is untouched.
+     */
+    fun markOpened(item: GameItem) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.updateLastPlayed(item.id, System.currentTimeMillis())
+        }
+    }
+
+    // ---- Derived lists for the Saves / Recent tabs -------------------------
+    // These are just filtered views of the same `games` flow, so nothing new
+    // is stored and nothing existing changes.
+
+    /** Favourites, newest first. */
+    val favorites: StateFlow<List<GameItem>> = games
+        .map { list -> list.filter { it.isFavorite } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Anything that has been opened at least once, most recent first. */
+    val recent: StateFlow<List<GameItem>> = games
+        .map { list ->
+            list.filter { it.lastPlayedAt != null }
+                .sortedByDescending { it.lastPlayedAt ?: 0L }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }
