@@ -26,6 +26,11 @@
             android:exported="false"
             android:theme="@style/Theme.BudsPro" />
 
+        <activity
+            android:name=".ImageViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.BudsPro" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

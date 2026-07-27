@@ -30,6 +30,24 @@ interface GameDao {
     @Query("UPDATE games SET isFavorite = :fav WHERE id = :id")
     suspend fun updateFavorite(id: String, fav: Boolean)
 
+    @Query("UPDATE games SET coverPath = :path WHERE id = :id")
+    suspend fun updateCover(id: String, path: String?)
+
+    @Query("UPDATE games SET folderId = :folderId WHERE id = :id")
+    suspend fun updateFolder(id: String, folderId: String?)
+
+    @Query("UPDATE games SET title = :name WHERE id = :id")
+    suspend fun updateTitle(id: String, name: String)
+
+    @Query("SELECT * FROM games WHERE folderId = :folderId")
+    suspend fun getItemsInFolder(folderId: String): List<GameItem>
+
+    @Query("SELECT * FROM games WHERE folderId = :folderId ORDER BY addedAt DESC")
+    fun getByFolder(folderId: String): Flow<List<GameItem>>
+
+    @Query("SELECT * FROM games WHERE folderId IS NULL ORDER BY addedAt DESC")
+    fun getRoot(): Flow<List<GameItem>>
+
     /**
      * Stamps the "last opened" time so the Recent tab has something to show.
      * Additive only: no schema change (lastPlayedAt already exists), so

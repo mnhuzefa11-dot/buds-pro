@@ -5,13 +5,16 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
+import com.budspro.app.data.MIGRATION_1_2
+
 @Database(
-    entities = [GameItem::class],
-    version = 1,
+    entities = [GameItem::class, Folder::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun gameDao(): GameDao
+    abstract fun folderDao(): FolderDao
 
     companion object {
         @Volatile
@@ -23,7 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "buds_pro.db"
-                ).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
             }
         }
     }
