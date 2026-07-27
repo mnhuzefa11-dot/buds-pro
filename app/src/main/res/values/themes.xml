@@ -1,3 +1,15 @@
 <resources>
-    <style name="Theme.BudsPro" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      Dark window theme so the app never flashes white while starting and so
+      the plain-Android screens (the JSON viewer inside PlayerActivity) match
+      the dark Compose UI.
+    -->
+    <style name="Theme.BudsPro" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/buds_background</item>
+        <item name="android:colorBackground">@color/buds_background</item>
+        <item name="android:statusBarColor">@color/buds_background</item>
+        <item name="android:navigationBarColor">@color/buds_background</item>
+        <item name="android:textColorPrimary">@color/buds_text_primary</item>
+        <item name="android:textColorSecondary">@color/buds_text_secondary</item>
+    </style>
 </resources>

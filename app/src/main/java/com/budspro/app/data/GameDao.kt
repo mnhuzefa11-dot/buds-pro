@@ -29,4 +29,12 @@ interface GameDao {
 
     @Query("UPDATE games SET isFavorite = :fav WHERE id = :id")
     suspend fun updateFavorite(id: String, fav: Boolean)
+
+    /**
+     * Stamps the "last opened" time so the Recent tab has something to show.
+     * Additive only: no schema change (lastPlayedAt already exists), so
+     * previously imported items keep working exactly as before.
+     */
+    @Query("UPDATE games SET lastPlayedAt = :ts WHERE id = :id")
+    suspend fun updateLastPlayed(id: String, ts: Long)
 }
