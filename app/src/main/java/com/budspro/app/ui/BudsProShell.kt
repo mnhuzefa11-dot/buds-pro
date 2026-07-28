@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.MenuBook
@@ -115,6 +116,7 @@ fun BudsProShell(
     var collectionPickerItem by remember { mutableStateOf<GameItem?>(null) }
     var newCollectionForItem by remember { mutableStateOf<GameItem?>(null) }
     var coverTargetId by remember { mutableStateOf<String?>(null) }
+    var showCreateCollection by remember { mutableStateOf(false) }
     var hero by remember { mutableStateOf<Pair<GameItem, Rect>?>(null) }
 
     val coverPicker = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -212,13 +214,21 @@ fun BudsProShell(
             }
         },
         floatingActionButton = {
-            if (currentRoute == BudsDestination.LIBRARY.route) {
-                ExtendedFloatingActionButton(
+            when (currentRoute) {
+                BudsDestination.LIBRARY.route -> ExtendedFloatingActionButton(
                     onClick = onImportRequested,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     icon = { Icon(Icons.Filled.Add, contentDescription = "Import") },
                     text = { Text("Import") }
+                )
+
+                BudsDestination.COLLECTIONS.route -> ExtendedFloatingActionButton(
+                    onClick = { showCreateCollection = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = { Icon(Icons.Filled.CreateNewFolder, contentDescription = "New collection") },
+                    text = { Text("New") }
                 )
             }
         }
@@ -269,7 +279,7 @@ fun BudsProShell(
                         isLoading = isLoading,
                         hapticsEnabled = prefs.hapticsEnabled,
                         onOpenCollection = { navController.navigate("collection/${it.id}") },
-                        onCreate = { viewModel.createCollection(it) },
+                        onRequestCreate = { showCreateCollection = true },
                         onRename = viewModel::renameCollection,
                         onDelete = viewModel::deleteCollection
                     )
@@ -396,6 +406,16 @@ fun BudsProShell(
             onDismiss = { collectionPickerItem = null },
             onSelect = { viewModel.setItemCollection(item.id, it) },
             onCreateNew = { newCollectionForItem = item }
+        )
+    }
+
+    if (showCreateCollection) {
+        TextInputDialog(
+            title = "New collection",
+            label = "Collection name",
+            confirmLabel = "Create",
+            onDismiss = { showCreateCollection = false },
+            onConfirm = { viewModel.createCollection(it) }
         )
     }
 

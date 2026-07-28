@@ -58,12 +58,11 @@ fun CollectionsScreen(
     isLoading: Boolean,
     hapticsEnabled: Boolean,
     onOpenCollection: (CollectionItem) -> Unit,
-    onCreate: (String) -> Unit,
+    onRequestCreate: () -> Unit,
     onRename: (String, String) -> Unit,
     onDelete: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showCreate by remember { mutableStateOf(false) }
     var sheetTarget by remember { mutableStateOf<CollectionItem?>(null) }
     var renameTarget by remember { mutableStateOf<CollectionItem?>(null) }
     var deleteTarget by remember { mutableStateOf<CollectionItem?>(null) }
@@ -80,7 +79,7 @@ fun CollectionsScreen(
                     title = "No collections yet",
                     message = "Group your content into collections like \"Biology\" or \"Math Games\", then jump straight to what you need.",
                     actionLabel = "Create a collection",
-                    onAction = { showCreate = true }
+                    onAction = onRequestCreate
                 )
             } else {
                 LazyVerticalGrid(
@@ -102,16 +101,6 @@ fun CollectionsScreen(
                 }
             }
         }
-    }
-
-    if (showCreate) {
-        TextInputDialog(
-            title = "New collection",
-            label = "Collection name",
-            confirmLabel = "Create",
-            onDismiss = { showCreate = false },
-            onConfirm = { onCreate(it) }
-        )
     }
 
     sheetTarget?.let { target ->
