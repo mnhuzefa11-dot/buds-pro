@@ -243,17 +243,26 @@ fun LibraryGameCard(
 fun CoverArt(item: GameItem, accent: Color, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val cover = item.effectiveCover
-    val fallbackSource: Any? = when {
+    val sourceFile: File? = when {
         cover != null && File(cover).exists() -> File(cover)
         item.type.equals("image", ignoreCase = true) ->
             File(File(context.filesDir, "games"), item.fileName)
         else -> null
     }
 
-    if (fallbackSource != null) {
+    if (sourceFile != null) {
+        // A replaced cover is written back to the same path ("<id>.jpg"), so
+        // Coil would happily serve the previous image from its memory/disk
+        // cache and "Change Cover" would look like it did nothing. Folding the
+        // file's mtime+size into the cache key makes each new cover a distinct
+        // entry, so the change shows up immediately.
+        val stamp = "${sourceFile.lastModified()}-${sourceFile.length()}"
+        val key = "${sourceFile.absolutePath}#$stamp"
         AsyncImage(
             model = ImageRequest.Builder(context)
-                .data(fallbackSource)
+                .data(sourceFile)
+                .memoryCacheKey(key)
+                .diskCacheKey(key)
                 .crossfade(true)
                 .build(),
             contentDescription = item.title,

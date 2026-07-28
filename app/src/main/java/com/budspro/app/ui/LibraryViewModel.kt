@@ -37,6 +37,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.getInstance(app)
     private val gameDao = db.gameDao()
     private val collectionDao = db.collectionDao()
+    private val annotationDao = db.studyAnnotationDao()
     private val prefsRepo = UserPreferencesRepository(app)
     private val backupManager = BackupManager(app)
 
@@ -169,6 +170,15 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 if (f.exists()) f.delete()
             }
             gameDao.deleteById(item.id)
+            // Clean up data keyed off this item so deleting really deletes:
+            // study annotations and the remembered scroll position would
+            // otherwise linger forever and could be inherited by a future
+            // item that happened to reuse the id.
+            runCatching { annotationDao.deleteByGameId(item.id) }
+            runCatching {
+                context.getSharedPreferences("buds_scroll", android.content.Context.MODE_PRIVATE)
+                    .edit().remove(item.id).apply()
+            }
             refreshStorageStats()
             _statusMessage.value = "\"${item.title}\" deleted"
         }
@@ -269,7 +279,8 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             val result = backupManager.export(
                 destination = destination,
                 items = gameDao.getAllOnce(),
-                collections = collectionDao.getAllOnce()
+                collections = collectionDao.getAllOnce(),
+                annotations = runCatching { annotationDao.getAllOnce() }.getOrDefault(emptyList())
             )
             _statusMessage.value = result.fold(
                 onSuccess = { "Backup exported" },
@@ -285,6 +296,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             result.onSuccess { payload ->
                 payload.collections.forEach { collectionDao.insert(it) }
                 payload.items.forEach { gameDao.insert(it) }
+                payload.annotations.forEach { runCatching { annotationDao.upsert(it) } }
                 refreshStorageStats()
             }
             _statusMessage.value = result.fold(

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.budspro.app.data.CollectionItem
 import com.budspro.app.data.GameItem
+import com.budspro.app.data.StudyAnnotation
 import com.budspro.app.data.effectiveCover
 import org.json.JSONArray
 import org.json.JSONObject
@@ -29,13 +30,15 @@ class BackupManager(private val context: Context) {
 
     data class Payload(
         val items: List<GameItem>,
-        val collections: List<CollectionItem>
+        val collections: List<CollectionItem>,
+        val annotations: List<StudyAnnotation> = emptyList()
     )
 
     fun export(
         destination: Uri,
         items: List<GameItem>,
-        collections: List<CollectionItem>
+        collections: List<CollectionItem>,
+        annotations: List<StudyAnnotation> = emptyList()
     ): Result<Unit> = runCatching {
         val gamesDir = File(context.filesDir, "games")
         val coversDir = File(context.filesDir, "covers")
@@ -45,7 +48,7 @@ class BackupManager(private val context: Context) {
 
         ZipOutputStream(out.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(MANIFEST))
-            zip.write(buildManifest(items, collections).toByteArray(Charsets.UTF_8))
+            zip.write(buildManifest(items, collections, annotations).toByteArray(Charsets.UTF_8))
             zip.closeEntry()
 
             items.forEach { item ->
@@ -96,7 +99,7 @@ class BackupManager(private val context: Context) {
         }
 
         val json = manifestJson ?: error("Backup is missing its manifest")
-        parseManifest(json, coversDir)
+        parseManifest(json, coversDir, gamesDir)
     }
 
     // ------------------------------------------------------------------
@@ -116,7 +119,11 @@ class BackupManager(private val context: Context) {
         target.outputStream().use { zip.copyTo(it) }
     }
 
-    private fun buildManifest(items: List<GameItem>, collections: List<CollectionItem>): String {
+    private fun buildManifest(
+        items: List<GameItem>,
+        collections: List<CollectionItem>,
+        annotations: List<StudyAnnotation>
+    ): String {
         val root = JSONObject()
         root.put("version", BACKUP_VERSION)
         root.put("exportedAt", System.currentTimeMillis())
@@ -153,10 +160,23 @@ class BackupManager(private val context: Context) {
         }
         root.put("collections", collectionArray)
 
+        val annotationArray = JSONArray()
+        annotations.forEach { a ->
+            val o = JSONObject()
+            o.put("id", a.id)
+            o.put("gameId", a.gameId)
+            o.put("text", a.text)
+            o.put("xRatio", a.xRatio.toDouble())
+            o.put("yRatio", a.yRatio.toDouble())
+            o.put("createdAt", a.createdAt)
+            annotationArray.put(o)
+        }
+        root.put("annotations", annotationArray)
+
         return root.toString()
     }
 
-    private fun parseManifest(json: String, coversDir: File): Payload {
+    private fun parseManifest(json: String, coversDir: File, gamesDir: File): Payload {
         val root = JSONObject(json)
 
         val items = mutableListOf<GameItem>()
@@ -197,7 +217,33 @@ class BackupManager(private val context: Context) {
             )
         }
 
-        return Payload(items = items.filter { it.fileName.isNotBlank() }, collections = collections)
+        val annotations = mutableListOf<StudyAnnotation>()
+        val annotationArray = root.optJSONArray("annotations") ?: JSONArray()
+        for (i in 0 until annotationArray.length()) {
+            val o = annotationArray.getJSONObject(i)
+            annotations += StudyAnnotation(
+                id = o.getString("id"),
+                gameId = o.optString("gameId"),
+                text = o.optString("text"),
+                xRatio = o.optDouble("xRatio", 0.0).toFloat(),
+                yRatio = o.optDouble("yRatio", 0.0).toFloat(),
+                createdAt = o.optLong("createdAt", System.currentTimeMillis())
+            )
+        }
+
+        // Only restore rows whose content file actually made it out of the
+        // archive. Inserting a row for a missing file would put a permanently
+        // broken card in the library that cannot be opened.
+        val restorable = items.filter {
+            it.fileName.isNotBlank() && File(gamesDir, it.fileName).exists()
+        }
+        val restorableIds = restorable.mapTo(HashSet()) { it.id }
+
+        return Payload(
+            items = restorable,
+            collections = collections,
+            annotations = annotations.filter { it.gameId in restorableIds }
+        )
     }
 
     private fun JSONObject.optStringOrNull(key: String): String? =
