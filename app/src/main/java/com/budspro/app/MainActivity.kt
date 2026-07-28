@@ -85,7 +85,9 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.budspro.app.data.Folder
 import com.budspro.app.data.GameItem
+import com.budspro.app.ui.BudsProShell
 import com.budspro.app.ui.GameViewModel
+import com.budspro.app.ui.LibraryViewModel
 import com.budspro.app.ui.theme.BudsProTheme
 import com.budspro.app.ui.theme.colorForType
 import java.io.File
@@ -94,26 +96,95 @@ import java.util.Date
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
+
+    /** Original view model — kept so the legacy [BudsProApp] still works. */
     private val viewModel: GameViewModel by viewModels()
+
+    /** New view model backing the Library / Collections / Settings shell. */
+    private val libraryViewModel: LibraryViewModel by viewModels()
+
+    private val importPicker = registerForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        uris.orEmpty().forEach { uri ->
+            var name = "untitled"
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst() && idx >= 0) name = cursor.getString(idx)
+            }
+            // Import still goes through the original, proven code path.
+            viewModel.importFile(uri, name)
+        }
+        if (uris.orEmpty().isNotEmpty()) libraryViewModel.refreshStorageStats()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            BudsProTheme {
-                BudsProApp(viewModel) { item ->
-                    viewModel.markOpened(item)
-                    if (item.type == "image") {
-                        val intent = Intent(this, ImageViewerActivity::class.java)
-                        intent.putExtra("imagePath", File(filesDir, "games/${item.fileName}").absolutePath)
-                        startActivity(intent)
-                    } else {
-                        val intent = Intent(this, PlayerActivity::class.java)
-                        intent.putExtra("gameId", item.id)
-                        startActivity(intent)
-                    }
-                }
+            val prefs by libraryViewModel.preferences.collectAsState()
+            BudsProTheme(theme = prefs.theme) {
+                BudsProShell(
+                    viewModel = libraryViewModel,
+                    appVersion = appVersionName(),
+                    onImportRequested = { launchImportPicker() },
+                    onOpenItem = { item -> openItem(item) },
+                    onOpenStudy = { item -> openStudy(item) }
+                )
             }
         }
     }
+
+    private fun launchImportPicker() {
+        importPicker.launch(
+            arrayOf(
+                "text/html",
+                "application/pdf",
+                "application/json",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "*/*"
+            )
+        )
+    }
+
+    /**
+     * Opening an item is byte-for-byte the same behaviour as before: images go
+     * to ImageViewerActivity, everything else to PlayerActivity (which keeps
+     * the WebViewAssetLoader for HTML games and therefore localStorage).
+     */
+    private fun openItem(item: GameItem) {
+        viewModel.markOpened(item)
+        if (item.type == "image") {
+            val intent = Intent(this, ImageViewerActivity::class.java)
+            intent.putExtra("imagePath", File(filesDir, "games/${item.fileName}").absolutePath)
+            // Optional extra used only for play-time stats; the viewer works
+            // exactly as before without it.
+            intent.putExtra("gameId", item.id)
+            startActivity(intent)
+        } else {
+            val intent = Intent(this, PlayerActivity::class.java)
+            intent.putExtra("gameId", item.id)
+            startActivity(intent)
+        }
+    }
+
+    private fun openStudy(item: GameItem) {
+        val intent = Intent(this, StudyViewerActivity::class.java)
+        intent.putExtra("gameId", item.id)
+        intent.putExtra("fileName", item.fileName)
+        startActivity(intent)
+    }
+
+    private fun appVersionName(): String = runCatching {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        val code = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            @Suppress("DEPRECATION") info.versionCode.toLong()
+        }
+        "${info.versionName} (build $code)"
+    }.getOrDefault("1.0")
 }
 
 private enum class BudsTab(val label: String, val icon: ImageVector) {

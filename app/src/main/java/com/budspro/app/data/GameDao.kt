@@ -58,4 +58,30 @@ interface GameDao {
      */
     @Query("UPDATE games SET lastPlayedAt = :ts WHERE id = :id")
     suspend fun updateLastPlayed(id: String, ts: Long)
+
+    // ------------------------------------------------------------------
+    // Added for Collections / new cover column / play-time tracking.
+    // All additive: no existing query above was changed.
+    // ------------------------------------------------------------------
+
+    @Query("SELECT * FROM games ORDER BY addedAt DESC")
+    suspend fun getAllOnce(): List<GameItem>
+
+    @Query("UPDATE games SET coverImagePath = :path WHERE id = :id")
+    suspend fun updateCoverImagePath(id: String, path: String?)
+
+    @Query("UPDATE games SET collectionId = :collectionId WHERE id = :id")
+    suspend fun updateCollection(id: String, collectionId: String?)
+
+    @Query("SELECT * FROM games WHERE collectionId = :collectionId ORDER BY addedAt DESC")
+    fun getByCollection(collectionId: String): Flow<List<GameItem>>
+
+    @Query("SELECT * FROM games WHERE collectionId = :collectionId ORDER BY addedAt DESC")
+    suspend fun getItemsInCollection(collectionId: String): List<GameItem>
+
+    @Query("UPDATE games SET collectionId = NULL WHERE collectionId = :collectionId")
+    suspend fun clearCollection(collectionId: String)
+
+    @Query("UPDATE games SET totalPlayTime = totalPlayTime + :deltaMs WHERE id = :id")
+    suspend fun addPlayTime(id: String, deltaMs: Long)
 }

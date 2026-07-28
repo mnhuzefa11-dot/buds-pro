@@ -2,6 +2,7 @@ package com.budspro.app.data
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
@@ -18,5 +19,13 @@ interface StudyAnnotationDao {
 
     @Query("DELETE FROM study_annotations WHERE gameId = :gameId")
     suspend fun deleteByGameId(gameId: String)
+
+    // Added for library backup/restore (additive only).
+
+    @Query("SELECT * FROM study_annotations")
+    suspend fun getAllOnce(): List<StudyAnnotation>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(annotation: StudyAnnotation)
 
 }

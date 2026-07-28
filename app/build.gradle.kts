@@ -12,8 +12,8 @@ android {
         applicationId = "com.budspro.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
     }
 
     buildTypes {
@@ -56,6 +56,13 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     implementation("io.coil-kt:coil-compose:2.6.0")
-    implementation("androidx.compose.animation:animation:1.5.4")
+    implementation("androidx.compose.animation:animation")
+
+    // --- Added for this release (additive only) ---
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
     kapt("androidx.room:room-compiler:2.6.1")
 }

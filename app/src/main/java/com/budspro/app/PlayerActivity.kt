@@ -20,6 +20,35 @@ import java.io.File
 
 class PlayerActivity : ComponentActivity() {
 
+    /**
+     * Play-time tracking (added in v2).
+     *
+     * Implemented purely in onResume/onPause so the original onCreate logic —
+     * including the WebViewAssetLoader setup that makes localStorage persist —
+     * is completely untouched.
+     */
+    private var resumedAtMs: Long = 0L
+
+    override fun onResume() {
+        super.onResume()
+        resumedAtMs = System.currentTimeMillis()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        val startedAt = resumedAtMs
+        resumedAtMs = 0L
+        val id = intent.getStringExtra("gameId") ?: return
+        if (startedAt <= 0L) return
+        val delta = System.currentTimeMillis() - startedAt
+        // Ignore absurd values (e.g. device slept for hours on this screen).
+        if (delta <= 0L || delta > 6L * 60L * 60L * 1000L) return
+        val dao = AppDatabase.getInstance(applicationContext).gameDao()
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { dao.addPlayTime(id, delta) }
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

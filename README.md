@@ -40,10 +40,59 @@ Because the package name is unchanged (`com.budspro.app`), this installs as an
 
 ## App interface
 
-- **Library** — every imported file as a card (title, type, size, progress,
-  favourite, delete) plus the `+` Import button.
-- **Saves** — only the items you have hearted.
-- **Recent** — items you have opened, most recent first.
-- **Settings** — library/saved/recent counts, storage used, supported types.
+The app uses a three-tab bottom navigation bar.
 
-Supported file types: **HTML**, **PDF**, **JSON**.
+- **Library** — every imported file as a card. Covers fill the card and crop
+  to fit, with the title on a gradient overlay, a file-type badge, a favourite
+  heart and a progress bar. Search, filter chips (favourites, recent, by type),
+  sorting, a grid/list toggle and pull-to-refresh are all here, plus the `+`
+  Import button.
+- **Collections** — group items into named collections such as "Biology" or
+  "Math Games". Each tile shows a 2x2 mosaic of the first four covers inside
+  it. Tap to open, long press to rename or delete.
+- **Settings** — theme, default view, storage usage, cache, backup and About.
+
+The **Study** screen (image annotation) is still available from the book icon
+in the Library top bar.
+
+Supported file types: **HTML**, **PDF**, **JSON**, **images**.
+
+## Long press any item
+
+Long pressing a card (with haptic feedback) opens a context menu:
+
+Open/Play · Add or Change Cover · Rename · Add to Collection ·
+Mark as Favorite / Unfavorite · Share file · View Info · Delete
+
+"View Info" shows file size, date added, type, last opened, progress and
+total time spent. "Delete" always asks for confirmation.
+
+## Themes
+
+Four themes are selectable in Settings, all built around the purple accent
+`#A855F7`: **Dark** (default), **Light**, **AMOLED Black** and **Purple**.
+Your choice is saved with DataStore and applied on next launch.
+
+## Backup and restore
+
+Settings can export your whole library — content files, cover images,
+collections and progress — into a single `.zip` you can store anywhere.
+Importing a backup **merges** it into your library: entries sharing an id are
+replaced by the backup's copy, everything else is left alone.
+
+## Where your files live
+
+Everything you import is copied into the app's private storage under
+`filesDir/games/`, with covers in `filesDir/covers/`. Nothing is uploaded and
+nothing needs network access, so the whole library works offline.
+
+HTML games are served through `WebViewAssetLoader` over a real local origin
+(`appassets.androidplatform.net`). That is what makes `localStorage` a genuine
+OS-backed file, so game saves survive app restarts and updates.
+
+## Data and upgrades
+
+The Room database is at version 4. Upgrading from any earlier version migrates
+in place — imported files, covers, favourites and progress are all preserved.
+Because the package name is unchanged, installing a new APK is an update over
+the existing app rather than a fresh install.
