@@ -232,59 +232,94 @@ fun LibraryScreen(
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize()
         ) {
-            AnimatedVisibility(visible = isLoading, enter = fadeIn(), exit = fadeOut()) {
-                ShimmerGrid()
+            LibraryContent(
+                visible = visible,
+                isLoading = isLoading,
+                query = query,
+                gridMode = gridMode,
+                hapticsEnabled = hapticsEnabled,
+                onOpen = onOpen,
+                onLongPress = onLongPress,
+                onImport = onImport,
+                onClearSearch = { query = ""; filter = LibraryFilter.ALL }
+            )
+        }
+    }
+}
+
+/**
+ * The shimmer / empty-state / grid / list portion of the library.
+ *
+ * Deliberately a top-level composable with no layout receiver: when these
+ * `AnimatedVisibility` calls sat directly inside [LibraryScreen]'s `Column`,
+ * Kotlin resolved them to the `ColumnScope` overload, which cannot be reached
+ * through the `BoxScope` lambda of [BudsPullToRefresh]. Hoisting them here
+ * makes the plain (receiver-less) overload the only candidate, and the two
+ * states still cross-fade on top of each other exactly as intended.
+ */
+@Composable
+private fun LibraryContent(
+    visible: List<GameItem>,
+    isLoading: Boolean,
+    query: String,
+    gridMode: Boolean,
+    hapticsEnabled: Boolean,
+    onOpen: (GameItem, androidx.compose.ui.geometry.Rect) -> Unit,
+    onLongPress: (GameItem) -> Unit,
+    onImport: () -> Unit,
+    onClearSearch: () -> Unit
+) {
+    AnimatedVisibility(visible = isLoading, enter = fadeIn(), exit = fadeOut()) {
+        ShimmerGrid()
+    }
+
+    AnimatedVisibility(visible = !isLoading, enter = fadeIn(), exit = fadeOut()) {
+        when {
+            visible.isEmpty() && query.isNotBlank() -> IllustratedEmptyState(
+                icon = Icons.Filled.Search,
+                title = "No matches",
+                message = "Nothing in your library matches \"$query\". Try a different search or clear the filters.",
+                actionLabel = "Clear search",
+                onAction = onClearSearch
+            )
+
+            visible.isEmpty() -> IllustratedEmptyState(
+                icon = Icons.Filled.LibraryBooks,
+                title = "Your library is waiting",
+                message = "Import HTML games, PDFs, images or JSON sets and they'll live here — fully offline, always yours.",
+                actionLabel = "Import files",
+                onAction = onImport
+            )
+
+            gridMode -> LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 110.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(visible, key = { it.id }) { item ->
+                    LibraryGameCard(
+                        item = item,
+                        onOpen = { rect -> onOpen(item, rect) },
+                        onLongPress = { onLongPress(item) },
+                        hapticsEnabled = hapticsEnabled
+                    )
+                }
             }
 
-            AnimatedVisibility(visible = !isLoading, enter = fadeIn(), exit = fadeOut()) {
-                when {
-                    visible.isEmpty() && query.isNotBlank() -> IllustratedEmptyState(
-                        icon = Icons.Filled.Search,
-                        title = "No matches",
-                        message = "Nothing in your library matches \"$query\". Try a different search or clear the filters.",
-                        actionLabel = "Clear search",
-                        onAction = { query = ""; filter = LibraryFilter.ALL }
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 110.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(visible, key = { it.id }) { item ->
+                    LibraryListRow(
+                        item = item,
+                        onOpen = { rect -> onOpen(item, rect) },
+                        onLongPress = { onLongPress(item) },
+                        hapticsEnabled = hapticsEnabled
                     )
-
-                    visible.isEmpty() -> IllustratedEmptyState(
-                        icon = Icons.Filled.LibraryBooks,
-                        title = "Your library is waiting",
-                        message = "Import HTML games, PDFs, images or JSON sets and they'll live here — fully offline, always yours.",
-                        actionLabel = "Import files",
-                        onAction = onImport
-                    )
-
-                    gridMode -> LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 110.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(visible, key = { it.id }) { item ->
-                            LibraryGameCard(
-                                item = item,
-                                onOpen = { rect -> onOpen(item, rect) },
-                                onLongPress = { onLongPress(item) },
-                                hapticsEnabled = hapticsEnabled
-                            )
-                        }
-                    }
-
-                    else -> LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 110.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(visible, key = { it.id }) { item ->
-                            LibraryListRow(
-                                item = item,
-                                onOpen = { rect -> onOpen(item, rect) },
-                                onLongPress = { onLongPress(item) },
-                                hapticsEnabled = hapticsEnabled
-                            )
-                        }
-                    }
                 }
             }
         }
