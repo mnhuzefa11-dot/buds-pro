@@ -55,6 +55,20 @@ The app uses a three-tab bottom navigation bar.
 The **Study** screen (image annotation) is still available from the book icon
 in the Library top bar.
 
+## Image viewing and zoom
+
+Both the image viewer and the Study screen use a shared zoomable canvas:
+
+- **Pinch** with two fingers to zoom (up to 6x, 8x in Study).
+- **Double tap** to jump to 3x, double tap again to fit.
+- **Drag** to pan; panning is clamped so the image never flies off screen.
+- **Single tap** hides/shows the top bar in the viewer.
+
+In Study, notes are placed deliberately: tap **Add note**, then tap the exact
+spot on the image. Markers are anchored to the image, so they stay on the
+right spot while you zoom and pan, and tapping one opens it for reading or
+deleting. The eye icon hides all markers so you can see the image cleanly.
+
 Supported file types: **HTML**, **PDF**, **JSON**, **images**.
 
 ## Long press any item

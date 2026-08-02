@@ -1,32 +1,38 @@
 package com.budspro.app
 
-import android.net.Uri
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOut
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,13 +41,13 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,24 +57,39 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.budspro.app.data.AppDatabase
 import com.budspro.app.data.GameItem
 import com.budspro.app.data.StudyAnnotation
+import com.budspro.app.ui.components.ZoomableImage
+import com.budspro.app.ui.components.rememberZoomState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.UUID
 
+/**
+ * Study viewer: a zoomable image with pinned notes.
+ *
+ * Fixes in this revision (no behaviour was removed):
+ *  - the image can be pinch-zoomed, double-tap zoomed and panned;
+ *  - a single touch no longer pops the "add note" dialog by accident —
+ *    notes are placed deliberately via "Add note" mode or by tapping an
+ *    existing marker to read it;
+ *  - markers are anchored to the image itself, so they stay on the right
+ *    spot while you zoom and pan instead of drifting away.
+ */
 @Composable
 fun StudyViewerScreen(
     imagePath: String,
@@ -78,97 +99,137 @@ fun StudyViewerScreen(
     val context = LocalContext.current
     val annotationDao = AppDatabase.getInstance(context.applicationContext).studyAnnotationDao()
     val annotations by annotationDao.getByGameId(gameId).collectAsState(initial = emptyList())
+    val density = LocalDensity.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
-    var scale by remember { mutableStateOf(1f) }
-    var showAddDialog by remember { mutableStateOf(false) }
+    val zoom = rememberZoomState(maxScale = 8f)
+    var placingNote by remember { mutableStateOf(false) }
+    var notesVisible by remember { mutableStateOf(true) }
+    var pendingPoint by remember { mutableStateOf<Offset?>(null) }
     var newAnnotationText by remember { mutableStateOf("") }
-    var tapPosition by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    var selected by remember { mutableStateOf<StudyAnnotation?>(null) }
+
+    val statusPadding = WindowInsets.statusBars.asPaddingValues()
+    val navPadding = WindowInsets.navigationBars.asPaddingValues()
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        // Image layer with tap detection and zoom
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.changes.size == 1 && event.changes[0].pressed) {
-                                tapPosition = event.changes[0].position
-                                showAddDialog = true
-                            }
-                        }
+        ZoomableImage(
+            model = imagePath,
+            contentDescription = "Study image",
+            modifier = Modifier.fillMaxSize(),
+            state = zoom,
+            onTap = { point ->
+                if (placingNote) {
+                    val ratio = zoom.containerToImageRatio(point)
+                    if (ratio != null) {
+                        pendingPoint = ratio
+                        placingNote = false
                     }
                 }
+            }
         ) {
-            AsyncImage(
-                model = imagePath,
-                contentDescription = "Study image",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale
-                    ),
-                contentScale = ContentScale.Fit
-            )
+            if (notesVisible) {
+                annotations.forEach { ann ->
+                    val pos = zoom.imageRatioToContainer(ann.xRatio, ann.yRatio)
+                    val markerPx = with(density) { 22.dp.toPx() }
+                    Box(
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    (pos.x - markerPx / 2f).toInt(),
+                                    (pos.y - markerPx / 2f).toInt()
+                                )
+                            }
+                            .size(22.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .border(2.dp, Color.White, RoundedCornerShape(50))
+                            .clickable { selected = ann }
+                    )
+                }
+            }
+        }
 
-            // Annotation bubbles
-            annotations.forEach { ann ->
-                val xPos = (ann.xRatio * 300).dp
-                val yPos = (ann.yRatio * 400).dp
-                Box(
-                    modifier = Modifier
-                        .padding(top = yPos, start = xPos)
-                        .size(12.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color(0xFFFF5722))
+        // Top bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
+                .padding(top = statusPadding.calculateTopPadding())
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+            }
+            Text(
+                text = if (annotations.isEmpty()) "Study" else "${annotations.size} notes",
+                color = Color.White,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            IconButton(onClick = { notesVisible = !notesVisible }) {
+                Icon(
+                    if (notesVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                    contentDescription = if (notesVisible) "Hide notes" else "Show notes",
+                    tint = Color.White
                 )
             }
         }
 
-        // Top controls
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 48.dp, start = 12.dp, end = 12.dp)
-                .align(Alignment.TopCenter),
-            verticalAlignment = Alignment.CenterVertically
+        // Hint shown while waiting for the user to pick a spot.
+        AnimatedVisibility(
+            visible = placingNote,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center)
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            IconButton(onClick = { scale = (scale * 1.2f).coerceAtMost(5f) }) {
-                Icon(Icons.Filled.ZoomIn, contentDescription = "Zoom in", tint = Color.White)
-            }
-            IconButton(onClick = { scale = (scale / 1.2f).coerceAtLeast(0.5f) }) {
-                Icon(Icons.Filled.ZoomOut, contentDescription = "Zoom out", tint = Color.White)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xE6000000)
+            ) {
+                Text(
+                    text = "Tap the image to place your note",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                )
             }
         }
 
-        // Add note button
         ExtendedFloatingActionButton(
             onClick = {
-                tapPosition = androidx.compose.ui.geometry.Offset(200f, 300f)
-                showAddDialog = true
+                if (placingNote) {
+                    placingNote = false
+                } else {
+                    placingNote = true
+                }
             },
-            text = { Text("Add Note") },
-            icon = { Icon(Icons.Filled.Add, contentDescription = "Add note") },
+            text = { Text(if (placingNote) "Cancel" else "Add note") },
+            icon = {
+                Icon(
+                    if (placingNote) Icons.Filled.Add else Icons.Filled.NoteAdd,
+                    contentDescription = null
+                )
+            },
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 48.dp),
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp)
+                .padding(bottom = navPadding.calculateBottomPadding() + 24.dp),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary
         )
     }
 
-    if (showAddDialog) {
+    // New note dialog — only after the user chose a point.
+    pendingPoint?.let { point ->
         AlertDialog(
-            onDismissRequest = { showAddDialog = false; newAnnotationText = "" },
-            title = { Text("Study Note") },
+            onDismissRequest = { pendingPoint = null; newAnnotationText = "" },
+            title = { Text("New note") },
             text = {
-                TextField(
+                OutlinedTextField(
                     value = newAnnotationText,
                     onValueChange = { newAnnotationText = it },
                     label = { Text("Note text") },
@@ -176,26 +237,46 @@ fun StudyViewerScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    if (newAnnotationText.isNotBlank()) {
+                TextButton(
+                    enabled = newAnnotationText.isNotBlank(),
+                    onClick = {
                         val ann = StudyAnnotation(
                             id = UUID.randomUUID().toString(),
                             gameId = gameId,
-                            text = newAnnotationText,
-                            xRatio = tapPosition.x / 300f,
-                            yRatio = tapPosition.y / 400f,
+                            text = newAnnotationText.trim(),
+                            xRatio = point.x,
+                            yRatio = point.y,
                             createdAt = System.currentTimeMillis()
                         )
-                        CoroutineScope(Dispatchers.IO).launch {
-                            annotationDao.insert(ann)
-                        }
+                        CoroutineScope(Dispatchers.IO).launch { annotationDao.insert(ann) }
+                        pendingPoint = null
+                        newAnnotationText = ""
                     }
-                    showAddDialog = false
-                    newAnnotationText = ""
-                }) { Text("Save") }
+                ) { Text("Save") }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false; newAnnotationText = "" }) { Text("Cancel") }
+                TextButton(onClick = { pendingPoint = null; newAnnotationText = "" }) { Text("Cancel") }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    // Reading / deleting an existing note.
+    selected?.let { ann ->
+        AlertDialog(
+            onDismissRequest = { selected = null },
+            title = { Text("Note") },
+            text = { Text(ann.text) },
+            confirmButton = {
+                TextButton(onClick = { selected = null }) { Text("Close") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    scope.launch(Dispatchers.IO) { annotationDao.deleteById(ann.id) }
+                    selected = null
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
             },
             containerColor = MaterialTheme.colorScheme.surface
         )

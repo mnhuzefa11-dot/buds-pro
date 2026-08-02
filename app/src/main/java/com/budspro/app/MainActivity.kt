@@ -161,6 +161,7 @@ class MainActivity : ComponentActivity() {
             // Optional extra used only for play-time stats; the viewer works
             // exactly as before without it.
             intent.putExtra("gameId", item.id)
+            intent.putExtra("title", item.title)
             startActivity(intent)
         } else {
             val intent = Intent(this, PlayerActivity::class.java)
