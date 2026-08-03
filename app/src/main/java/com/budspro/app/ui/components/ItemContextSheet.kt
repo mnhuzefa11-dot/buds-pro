@@ -67,6 +67,7 @@ sealed interface ItemAction {
     data object ChangeCover : ItemAction
     data object Rename : ItemAction
     data object AddToCollection : ItemAction
+    data object RemoveFromCollection : ItemAction
     data object ToggleFavorite : ItemAction
     data object Delete : ItemAction
     data object Share : ItemAction
@@ -144,8 +145,22 @@ fun ItemContextSheet(
             SheetRow(Icons.Filled.DriveFileRenameOutline, "Rename") {
                 onAction(ItemAction.Rename)
             }
-            SheetRow(Icons.Filled.Folder, "Add to Collection") {
-                onAction(ItemAction.AddToCollection)
+            if (item.collectionId != null) {
+                SheetRow(Icons.Filled.Folder, "Change Collection") {
+                    onAction(ItemAction.AddToCollection)
+                }
+                SheetRow(
+                    Icons.Filled.Folder,
+                    "Remove from Collection",
+                    tint = MaterialTheme.colorScheme.error,
+                    textColor = MaterialTheme.colorScheme.error
+                ) {
+                    onAction(ItemAction.RemoveFromCollection)
+                }
+            } else {
+                SheetRow(Icons.Filled.Folder, "Add to Collection") {
+                    onAction(ItemAction.AddToCollection)
+                }
             }
             SheetRow(
                 if (item.isFavorite) Icons.Filled.FavoriteBorder else Icons.Filled.Favorite,

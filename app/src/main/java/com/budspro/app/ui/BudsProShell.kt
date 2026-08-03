@@ -366,6 +366,7 @@ fun BudsProShell(
                     }
                     ItemAction.Rename -> renameItem = item
                     ItemAction.AddToCollection -> collectionPickerItem = item
+                    ItemAction.RemoveFromCollection -> viewModel.setItemCollection(item.id, null)
                     ItemAction.ToggleFavorite -> viewModel.toggleFavorite(item)
                     ItemAction.Delete -> deleteItem = item
                     ItemAction.Share -> shareItem(context, item)
